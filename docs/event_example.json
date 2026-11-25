@@ -1,0 +1,21 @@
+{
+  "id": "evt_000001",
+  "timestamp": "2026-11-23T19:45:46Z",
+  "event_type": "person_detected",
+  "object_class": "person",
+  "confidence": 0.86,
+  "bbox": {
+    "x": 523,
+    "y": 331,
+    "width": 55,
+    "height": 101
+  },
+  "frame_path": "events/frames/evt_000001.jpg",
+  "camera_id": "cam_01",
+  "severity": "medium",
+  "status": "new",
+  "raw_class": "person",
+  "detector": "yolo_onnx",
+  "source": "media/demo_person_bicycle_car.mp4",
+  "track_id": 1
+}

@@ -1,0 +1,39 @@
+# Конфигурация для демонстрации классов smoke_fire и spill на тестовой сцене.
+# Источник - изображение; используется только эвристический детектор (без нейросети).
+#
+#   python scripts/make_test_scene.py
+#   python run.py --config config.image.yaml
+
+app:
+  host: 127.0.0.1
+  port: 8010
+  mode: demo
+  camera_id: cam_test
+  autostart: true
+
+video:
+  source_type: image
+  path: media/test_scene.jpg
+  loop: true
+
+model:
+  backend: heuristics      # только эвристики: дым/огонь и разлив
+
+heuristics:
+  smoke_fire: true
+  spill: true
+  helmet_check: false
+  obstacle: false
+  min_area_ratio: 0.01
+
+events:
+  save_frames: true
+  min_confidence: 0.30
+  cooldown_sec: 5.0
+  frames_dir: events/frames_test
+  store_path: events/events_test.jsonl
+
+logging:
+  level: INFO
+  file: logs/app.log
+  console: true

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Крупные бинарные артефакты (скачиваются скриптом scripts/download_model.py)
+models/*.onnx
+media/*.mp4
+
+# Результаты работы модуля
+events/
+logs/
+
+# IDE / OS
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini

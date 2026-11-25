@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CV-модуль САТК — demo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">CV</span>
+      <div>
+        <h1>CV-модуль САТК</h1>
+        <p class="subtitle">SiPeed Lichee Module 4A · видео → детекция → событие → API</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="chip">режим: <b id="mode-info">—</b></span>
+      <span class="chip">модель: <b id="model-info">—</b></span>
+      <span id="state-badge" class="badge stopped">stopped</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel video-panel">
+      <div class="panel-head">
+        <h2>Видеопоток</h2>
+        <span class="muted" id="source-info">источник не задан</span>
+      </div>
+      <div class="video-wrap">
+        <img id="stream" src="/stream.mjpg" alt="Видеопоток с детекциями">
+        <div id="video-overlay" class="video-overlay hidden">Кадр ещё не сформирован</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="stat-label">FPS</span><span id="fps" class="stat-value">0.0</span></div>
+        <div class="stat"><span class="stat-label">Latency, мс</span><span id="latency" class="stat-value">0</span></div>
+        <div class="stat"><span class="stat-label">Latency avg</span><span id="latency-avg" class="stat-value">0</span></div>
+        <div class="stat"><span class="stat-label">Latency p95</span><span id="latency-p95" class="stat-value">0</span></div>
+        <div class="stat"><span class="stat-label">Кадров</span><span id="frames" class="stat-value">0</span></div>
+        <div class="stat"><span class="stat-label">Событий</span><span id="events-count" class="stat-value">0</span></div>
+        <div class="stat"><span class="stat-label">Пропущено</span><span id="frames-dropped" class="stat-value">0</span></div>
+        <div class="stat"><span class="stat-label">Ошибок</span><span id="errors" class="stat-value">0</span></div>
+      </div>
+    </section>
+
+    <aside class="panel control-events">
+      <div class="panel-head"><h2>Управление</h2></div>
+      <div class="controls">
+        <label class="field">
+          <span>Тип источника</span>
+          <select id="source-type">
+            <option value="file">Видеофайл</option>
+            <option value="camera">Камера</option>
+            <option value="rtsp">RTSP</option>
+            <option value="image">Изображение</option>
+            <option value="synthetic">Синтетика</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Путь к файлу / изображению</span>
+          <input id="source-path" type="text" placeholder="media/demo_person_bicycle_car.mp4">
+        </label>
+        <label class="field">
+          <span>Индекс камеры</span>
+          <input id="source-camera" type="number" min="0" value="0">
+        </label>
+
+        <label class="field">
+          <span>Порог confidence: <b id="conf-value">0.35</b></span>
+          <input id="conf-range" type="range" min="0.05" max="0.95" step="0.05" value="0.35">
+        </label>
+
+        <div class="buttons">
+          <button id="btn-start" class="btn primary">Старт</button>
+          <button id="btn-stop" class="btn">Стоп</button>
+          <button id="btn-apply-conf" class="btn ghost">Применить порог</button>
+        </div>
+        <div id="action-message" class="action-message"></div>
+        <div id="error-banner" class="error-banner hidden"></div>
+      </div>
+
+      <div class="panel-head events-head">
+        <h2>Журнал событий</h2>
+        <div class="events-tools">
+          <select id="event-filter">
+            <option value="">все классы</option>
+            <option value="person">Человек</option>
+            <option value="person_without_helmet">Без каски</option>
+            <option value="vehicle">Транспорт</option>
+            <option value="smoke_fire">Дым/огонь</option>
+            <option value="spill">Разлив</option>
+            <option value="obstacle">Препятствие</option>
+          </select>
+          <button id="btn-clear" class="btn small ghost">Очистить</button>
+        </div>
+      </div>
+      <div class="events-scroll">
+        <table class="events-table">
+          <thead>
+            <tr>
+              <th>Время</th><th>Тип</th><th>Класс</th><th>Conf</th><th>Крит.</th><th>Кадр</th>
+            </tr>
+          </thead>
+          <tbody id="events-body">
+            <tr class="empty"><td colspan="6">Событий пока нет</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </aside>
+  </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <button id="modal-close" class="modal-close">×</button>
+      <img id="modal-img" alt="Кадр события">
+      <div id="modal-meta" class="modal-meta"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

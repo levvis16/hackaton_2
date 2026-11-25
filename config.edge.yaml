@@ -1,0 +1,49 @@
+# Конфигурация для запуска на SiPeed Lichee Module 4A (edge-режим).
+# Ограничения платформы см. в README (раздел переноса на плату).
+
+app:
+  host: 0.0.0.0
+  port: 8000
+  mode: edge
+  camera_id: cam_edge_01
+  autostart: true
+
+video:
+  source_type: camera      # камера на MIPI CSI (для RTSP укажите rtsp и rtsp_url)
+  camera_index: 0
+  loop: false
+  target_fps: 15           # целевая частота обработки на плате
+  process_width: 640
+  frame_skip: 1            # обрабатывать каждый 2-й кадр при нехватке производительности
+  reconnect_attempts: 10
+  reconnect_delay_sec: 3.0
+
+model:
+  backend: yolo_onnx
+  path: models/yolov8n.onnx
+  labels: models/coco.names
+  input_size: 640
+  confidence_threshold: 0.40
+  iou_threshold: 0.45
+  providers:
+    - CPUExecutionProvider   # замените на NPU-провайдер платы после конвертации модели
+
+heuristics:
+  smoke_fire: true
+  spill: true
+  helmet_check: true
+  obstacle: true
+  obstacle_zone: [0.2, 0.6, 0.8, 1.0]
+  min_area_ratio: 0.02
+
+events:
+  save_frames: true        # на плате при нехватке места можно отключить
+  min_confidence: 0.40
+  cooldown_sec: 6.0
+  frames_dir: events/frames
+  store_path: events/events.jsonl
+
+logging:
+  level: INFO
+  file: logs/app.log
+  console: true

@@ -1,0 +1,54 @@
+# Конфигурация CV-модуля САТК (demo-режим, запуск на ноутбуке).
+# Все относительные пути разрешаются от каталога этого файла.
+
+app:
+  host: 0.0.0.0          # для локальной демонстрации; см. README (безопасность)
+  port: 8000
+  mode: demo             # demo | edge
+  camera_id: cam_01
+  autostart: true        # автоматически начинать обработку при старте сервиса
+
+video:
+  source_type: file      # file | camera | rtsp | image | synthetic
+  path: media/demo_person_bicycle_car.mp4
+  camera_index: 0
+  rtsp_url: ""
+  loop: true             # зацикливать видеофайл
+  target_fps: 0          # 0 -> максимально возможная частота
+  process_width: 640
+  frame_skip: 0          # пропускать N кадров между обработками (0 -> нет)
+  reconnect_attempts: 5
+  reconnect_delay_sec: 2.0
+
+model:
+  backend: auto          # auto | yolo_onnx | heuristics | mock
+  path: models/yolov8n.onnx
+  labels: models/coco.names
+  input_size: 640
+  confidence_threshold: 0.35
+  iou_threshold: 0.45
+  intra_op_num_threads: 4   # 0 = авто (все ядра); 4 даёт более стабильный FPS на ноутбуках
+  providers:
+    - CPUExecutionProvider   # на TH1520 используйте NPU-провайдер/рантайм платы
+
+heuristics:
+  smoke_fire: true       # дым/огонь (HSV-эвристика)
+  spill: true            # разлив/аномалия (эвристика)
+  helmet_check: true     # человек без каски
+  obstacle: true         # препятствие в зоне перед камерой
+  obstacle_zone: [0.2, 0.6, 0.8, 1.0]   # x1, y1, x2, y2 (доли кадра)
+  min_area_ratio: 0.015
+  confirm_frames: 3
+
+events:
+  save_frames: true
+  min_confidence: 0.35
+  cooldown_sec: 4.0
+  frames_dir: events/frames
+  store_path: events/events.jsonl
+  max_memory: 5000
+
+logging:
+  level: INFO
+  file: logs/app.log
+  console: true

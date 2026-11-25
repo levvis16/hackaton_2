@@ -1,0 +1,12 @@
+# Зависимости CV-модуля САТК (demo-запуск на ноутбуке)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+opencv-python-headless>=4.9
+onnxruntime>=1.17
+numpy>=1.26
+PyYAML>=6.0
+python-multipart>=0.0.9
+
+# Для тестов (необязательно; сами тесты используют только unittest):
+# httpx>=0.27   # нужен для fastapi.testclient.TestClient
+# pytest>=8.0
