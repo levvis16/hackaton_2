@@ -16,6 +16,19 @@ import uvicorn
 
 from app.config import load_config
 from app.logging_conf import setup_logging
+from app.shutdown import request_shutdown
+
+
+class ShutdownAwareServer(uvicorn.Server):
+    """uvicorn-сервер, который при сигнале остановки будит потоковые ответы.
+
+    Без этого Ctrl+C «зависает»: uvicorn ждёт закрытия бесконечного
+    MJPEG-соединения ещё до того, как вызовет lifespan-shutdown приложения.
+    """
+
+    def handle_exit(self, sig, frame) -> None:  # type: ignore[override]
+        request_shutdown()
+        super().handle_exit(sig, frame)
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,13 +77,27 @@ def main() -> None:
     url = f"http://{'127.0.0.1' if cfg.app.host in ('0.0.0.0', '::') else cfg.app.host}:{cfg.app.port}"
     logger.info("Demo UI: %s  |  API-документация: %s/docs", url, url)
 
-    uvicorn.run(
+    if args.reload:
+        # В режиме автоперезапуска сигналами управляет супервизор uvicorn.
+        # Таймаут страхует от зависания на открытом MJPEG-соединении.
+        uvicorn.run(
+            "app.main:app",
+            host=cfg.app.host,
+            port=cfg.app.port,
+            reload=True,
+            log_level="info",
+            timeout_graceful_shutdown=2,
+        )
+        return
+
+    config = uvicorn.Config(
         "app.main:app",
         host=cfg.app.host,
         port=cfg.app.port,
-        reload=args.reload,
         log_level="info",
+        timeout_graceful_shutdown=5,
     )
+    ShutdownAwareServer(config).run()
 
 
 if __name__ == "__main__":

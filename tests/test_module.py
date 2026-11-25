@@ -287,5 +287,31 @@ class TestServiceSurvivesBadSource(unittest.TestCase):
             self.assertEqual(client.get("/events").status_code, 200)
 
 
+class TestStreamShutdown(unittest.TestCase):
+    """Поток MJPEG должен завершаться при остановке сервиса (иначе Ctrl+C висит)."""
+
+    def test_mjpeg_generator_ends_on_shutdown(self):
+        import asyncio
+
+        from app import shutdown
+        from app.api.routes import mjpeg_stream
+
+        async def scenario():
+            shutdown.reset()
+            generator = mjpeg_stream(lambda: b"\xff\xd8JPEG", stream_fps=1000)
+            first = await generator.__anext__()
+            self.assertTrue(first.startswith(b"--frame"))
+            self.assertIn(b"\xff\xd8JPEG", first)
+            shutdown.request_shutdown()
+            # После сигнала остановки генератор обязан завершиться сам.
+            with self.assertRaises(StopAsyncIteration):
+                await generator.__anext__()
+
+        try:
+            asyncio.run(scenario())
+        finally:
+            shutdown.reset()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

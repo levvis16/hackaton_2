@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__
+from . import __version__, shutdown
 from .api import create_api_router
 from .config import Config, load_config
 from .logging_conf import setup_logging
@@ -36,6 +36,7 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        shutdown.reset()
         logger.info(
             "CV-модуль v%s запущен | режим=%s | backend=%s",
             __version__, cfg.app.mode, pipeline.detector.backend,
@@ -45,6 +46,9 @@ def create_app(config: Config | None = None) -> FastAPI:
         try:
             yield
         finally:
+            # Сначала будим долгоживущие потоки (MJPEG), потом гасим конвейер:
+            # так uvicorn не ждёт бесконечное соединение при Ctrl+C.
+            shutdown.request_shutdown()
             pipeline.stop()
             logger.info("CV-модуль остановлен")
 

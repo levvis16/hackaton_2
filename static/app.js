@@ -10,9 +10,26 @@ const CLASS_LABELS = {
 };
 
 const $ = (id) => document.getElementById(id);
+const API_TIMEOUT_MS = 20000;
+
+let busy = false;
+let currentState = "stopped";
 
 async function api(path, options) {
-  const response = await fetch(path, options);
+  // Ограничиваем ожидание, чтобы кнопка никогда не «висела» без реакции.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(path, { ...(options || {}), signal: controller.signal });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("сервер не ответил за " + API_TIMEOUT_MS / 1000 + " с");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   const type = response.headers.get("content-type") || "";
   const payload = type.includes("application/json") ? await response.json() : await response.text();
   if (!response.ok) {
@@ -22,6 +39,26 @@ async function api(path, options) {
   return payload;
 }
 
+function setMessage(text, isError) {
+  const el = $("action-message");
+  el.textContent = text || "";
+  el.classList.toggle("error", Boolean(isError));
+}
+
+function updateButtons() {
+  const running = currentState === "running" || currentState === "starting";
+  $("btn-start").disabled = busy || running;
+  $("btn-stop").disabled = busy || !running;
+  $("btn-apply-conf").disabled = busy;
+  $("btn-clear").disabled = busy;
+}
+
+function setBusy(value, text) {
+  busy = value;
+  if (text !== undefined) setMessage(text);
+  updateButtons();
+}
+
 function fmtTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -29,6 +66,7 @@ function fmtTime(iso) {
 }
 
 function setState(state, error) {
+  currentState = state;
   const badge = $("state-badge");
   badge.textContent = state;
   badge.className = "badge " + state;
@@ -40,8 +78,15 @@ function setState(state, error) {
     banner.classList.add("hidden");
   }
   const overlay = $("video-overlay");
-  if (state === "running" || state === "starting") overlay.classList.add("hidden");
-  else overlay.classList.remove("hidden");
+  if (state === "running" || state === "starting") {
+    overlay.classList.add("hidden");
+  } else {
+    overlay.classList.remove("hidden");
+    if (state === "error") overlay.textContent = "Источник видео недоступен — проверьте настройки справа";
+    else if (state === "finished") overlay.textContent = "Видеофайл воспроизведён полностью — нажмите «Старт»";
+    else overlay.textContent = "Обработка остановлена — нажмите «Старт»";
+  }
+  updateButtons();
 }
 
 async function refreshStatus() {
@@ -159,53 +204,69 @@ function reloadStream() {
 }
 
 async function doStart() {
+  if (busy) return;
+  setBusy(true, "Запуск обработки…");
   try {
     const result = await api("/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(collectSource()),
     });
-    $("action-message").textContent = result.message;
-    reloadStream();
+    setMessage(result.message, !result.ok);
+    if (result.ok) reloadStream();
   } catch (err) {
-    $("action-message").textContent = "Ошибка запуска: " + err.message;
+    setMessage("Ошибка запуска: " + err.message, true);
+  } finally {
+    setBusy(false);
   }
-  refreshStatus();
+  await refreshStatus();
 }
 
 async function doStop() {
+  if (busy) return;
+  setBusy(true, "Остановка обработки…");
   try {
     const result = await api("/stop", { method: "POST" });
-    $("action-message").textContent = result.message;
+    setMessage(result.message, !result.ok);
   } catch (err) {
-    $("action-message").textContent = "Ошибка остановки: " + err.message;
+    setMessage("Ошибка остановки: " + err.message, true);
+  } finally {
+    setBusy(false);
   }
-  refreshStatus();
+  await refreshStatus();
 }
 
 async function applyConfidence() {
+  if (busy) return;
   const value = Number($("conf-range").value);
+  setBusy(true);
   try {
     const result = await api("/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ confidence_threshold: value }),
     });
-    $("action-message").textContent = result.message;
+    setMessage(result.message);
   } catch (err) {
-    $("action-message").textContent = "Ошибка конфигурации: " + err.message;
+    setMessage("Ошибка конфигурации: " + err.message, true);
+  } finally {
+    setBusy(false);
   }
 }
 
 async function clearEvents() {
+  if (busy) return;
+  setBusy(true);
   try {
     const result = await api("/events", { method: "DELETE" });
-    $("action-message").textContent = result.message;
+    setMessage(result.message);
   } catch (err) {
-    $("action-message").textContent = "Ошибка очистки: " + err.message;
+    setMessage("Ошибка очистки: " + err.message, true);
+  } finally {
+    setBusy(false);
   }
-  refreshEvents();
-  refreshStatus();
+  await refreshEvents();
+  await refreshStatus();
 }
 
 function bind() {
@@ -226,6 +287,7 @@ function bind() {
 
 async function init() {
   bind();
+  updateButtons();
   try {
     const status = await api("/status");
     $("conf-range").value = 0.35;

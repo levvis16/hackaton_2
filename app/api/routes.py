@@ -5,12 +5,13 @@
 """
 from __future__ import annotations
 
-import time
+import asyncio
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
+from .. import shutdown
 from ..events.store import utc_now_iso
 from ..pipeline import Pipeline
 from ..schemas import (
@@ -23,6 +24,29 @@ from ..schemas import (
 )
 
 MJPEG_BOUNDARY = "frame"
+
+
+async def mjpeg_stream(get_frame, stream_fps: int):
+    """Асинхронный генератор кадров MJPEG.
+
+    Завершается при отключении клиента и при остановке сервиса (Ctrl+C):
+    иначе uvicorn бесконечно ждёт закрытия потока и «висит» при завершении.
+    """
+    interval = 1.0 / stream_fps
+    last = None
+    try:
+        while not shutdown.is_shutting_down():
+            data = get_frame()
+            if data is not None and data is not last:
+                last = data
+                yield (
+                    f"--{MJPEG_BOUNDARY}\r\n"
+                    "Content-Type: image/jpeg\r\n"
+                    f"Content-Length: {len(data)}\r\n\r\n"
+                ).encode() + data + b"\r\n"
+            await asyncio.sleep(interval)
+    except asyncio.CancelledError:  # клиент отключился / сервер остановлен
+        return
 
 
 def create_api_router(pipeline: Pipeline) -> APIRouter:
@@ -148,35 +172,13 @@ def create_api_router(pipeline: Pipeline) -> APIRouter:
     # ------------------------------------------------------------------
     @router.get("/stream.mjpg", summary="Видеопоток MJPEG с рамками детекций")
     def stream(stream_fps: int = Query(15, ge=1, le=60)) -> StreamingResponse:
-        interval = 1.0 / stream_fps
-
-        def generator():
-            last = None
-            idle = 0.0
-            try:
-                while True:
-                    data = pipeline.latest_frame()
-                    if data is not None and data is not last:
-                        last = data
-                        idle = 0.0
-                        yield (
-                            f"--{MJPEG_BOUNDARY}\r\n"
-                            "Content-Type: image/jpeg\r\n"
-                            f"Content-Length: {len(data)}\r\n\r\n"
-                        ).encode() + data + b"\r\n"
-                    else:
-                        idle += interval
-                    time.sleep(interval)
-            except GeneratorExit:  # клиент отключился
-                return
-
         headers = {
             "Cache-Control": "no-store, no-cache, must-revalidate",
             "Pragma": "no-cache",
             "Connection": "close",
         }
         return StreamingResponse(
-            generator(),
+            mjpeg_stream(pipeline.latest_frame, stream_fps),
             media_type=f"multipart/x-mixed-replace; boundary={MJPEG_BOUNDARY}",
             headers=headers,
         )
